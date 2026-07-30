@@ -80,24 +80,32 @@ class MedicalKnowledgeBase:
             changed   = False
             iteration += 1
             for conditions, conclusion, rule_cf in self.rules:
+                if conclusion in self.facts or conclusion in inferred:
+                    continue
                 all_known = all(
-                    c in self.facts or c in inferred for c in conditions
+                c in self.facts or c in inferred for c in conditions
                 )
-                if all_known and conclusion not in inferred:
-                    # Combine certainty factors
+
+                if all_known:
                     cond_cfs = [
                         self.certainty_factors.get(c,
                             inferred.get(c, 1.0))
                         for c in conditions
                     ]
-                    combined_cf = rule_cf * min(cond_cfs)
-                    inferred[conclusion] = round(combined_cf, 4)
+                    combined_cf = round(rule_cf * min(cond_cfs), 4)
+
+                    inferred[conclusion] = combined_cf
+
+                    # ADDED THESE TWO LINES
+                    self.facts.add(conclusion)
+                    self.certainty_factors[conclusion] = combined_cf
 
                     if verbose:
                         cond_str = " ∧ ".join(conditions)
                         print(f"  Iter {iteration}: "
-                              f"{cond_str} → {conclusion} "
-                              f"(CF={combined_cf:.3f})")
+                            f"{cond_str} → {conclusion} "
+                            f"(CF={combined_cf:.3f})")
+
                     changed = True
         return inferred
 
@@ -141,10 +149,21 @@ class MedicalKnowledgeBase:
             self.add_fact("tachycardia", 1.0)
 
         inferred = self.forward_chain()
-        diseases  = {k: v for k, v in inferred.items()
-                     if 'suspected' in k or 'confirmed' in k}
+        diseases  = {
+            k: v for k, v in inferred.items()
+            if 'suspected' in k or 'confirmed' in k
+            }
+        
+        actions = {
+            k: v for k, v in inferred.items()
+            if k in ["EMERGENCY", "ISOLATE_AND_TREAT", "REST_AND_MEDICATE"]
+            }
 
-        top = max(diseases, key=diseases.get) if diseases else "Unknown"
+        if diseases:
+            top = max(diseases, key=diseases.get)
+        else:
+            top = "Unknown"
+
         return {
             'summary':    f"Inferred {len(inferred)} conclusions",
             'diagnosis':  top,
