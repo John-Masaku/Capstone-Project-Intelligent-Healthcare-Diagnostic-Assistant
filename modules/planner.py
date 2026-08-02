@@ -24,7 +24,7 @@ class TreatmentPlanner:
             {
                 'name': 'CallEmergencyServices',
                 'precond': {'EMERGENCY_CASE', 'PATIENT_PRESENT'},
-                'delete':  {'EMERGENCY_CASE'},
+                'delete': set(),
                 'add':     {'EMERGENCY_SERVICES_CALLED'},
                 'cost': 0, 'duration': '5 minutes'
             },
@@ -47,7 +47,8 @@ class TreatmentPlanner:
                 'name': 'ReceiveBloodResults',
                 'precond': {'BLOOD_RESULTS_PENDING'},
                 'delete':  {'BLOOD_RESULTS_PENDING'},
-                'add':     {'BLOOD_RESULTS_AVAILABLE', 'DIAGNOSIS_REFINED'},
+                'add': {'BLOOD_RESULTS_AVAILABLE', 'DIAGNOSIS_REFINED',
+        'DIAGNOSIS_CONFIRMED'},
                 'cost': 0, 'duration': '2 hours'
             },
             {
@@ -57,13 +58,18 @@ class TreatmentPlanner:
                 'add':     {'PCR_PENDING'},
                 'cost': 1, 'duration': '24 hours'
             },
-            {
-                'name': 'ReceivePCRResult',
-                'precond': {'PCR_PENDING'},
-                'delete':  {'PCR_PENDING'},
-                'add':     {'PCR_RESULT_AVAILABLE', 'DIAGNOSIS_CONFIRMED'},
-                'cost': 0, 'duration': '24 hours'
-            },
+           {
+    'name': 'ReceivePCRResult',
+    'precond': {'PCR_PENDING'},
+    'delete': {'PCR_PENDING'},
+    'add': {
+        'PCR_RESULT_AVAILABLE',
+        'DIAGNOSIS_CONFIRMED',
+        'VIRAL_INFECTION'
+    },
+    'cost': 0,
+    'duration': '24 hours'
+},
             # Treatment
             {
                 'name': 'PrescribeAntiviral',
@@ -86,13 +92,14 @@ class TreatmentPlanner:
                 'add':     {'FLUIDS_ADMINISTERED'},
                 'cost': 1, 'duration': '1 hour'
             },
-            {
-                'name': 'MonitorVitals',
-                'precond': {'TREATMENT_STARTED', 'PATIENT_PRESENT'},
-                'delete':  set(),
-                'add':     {'VITALS_MONITORED'},
-                'cost': 0, 'duration': 'Continuous'
-            },
+           {
+    'name': 'MonitorVitals',
+    'precond': {'TREATMENT_STARTED', 'PATIENT_PRESENT'},
+    'delete': set(),
+    'add': {'VITALS_MONITORED'},
+    'cost': 0,
+    'duration': 'Continuous'
+},
             {
                 'name': 'IsolatePatient',
                 'precond': {'CONTAGIOUS_DISEASE', 'PATIENT_PRESENT'},
@@ -114,6 +121,14 @@ class TreatmentPlanner:
                 'add':     {'PATIENT_DISCHARGED'},
                 'cost': 0, 'duration': '30 minutes'
             },
+            {
+    'name': 'StartEmergencyTreatment',
+    'precond': {'PATIENT_IN_ICU', 'EMERGENCY_CASE'},
+    'delete': {'EMERGENCY_CASE'},
+    'add': {'TREATMENT_STARTED'},
+    'cost': 1,
+    'duration': '10 minutes'
+},
         ]
 
     def _apply_action(self, state: frozenset,

@@ -50,9 +50,11 @@ def build_system() -> HealthcareDiagnosticAgent:
     agent = HealthcareDiagnosticAgent()  
 
     print("\n  Initializing modules...")  
-    modules = {  
-        'KnowledgeBase': MedicalKnowledgeBase(),  
-        'BayesianNet':   SimpleBayesianDiagnostics(),  
-        'MLClassifier':  MLDiagnosticClassifier(),  
-        'NeuralNetwork': NeuralDiagnosticModel(),  
-        'Fuzzy
+    modules = {
+        'KnowledgeBase': MedicalKnowledgeBase(),
+        'BayesianNet': SimpleBayesianDiagnostics(),
+        'MLClassifier': MLDiagnosticClassifier(),
+        'NeuralNetwork': NeuralDiagnosticModel(),
+        'FuzzyController': FuzzySeverityAssessor(),
+        'TreatmentPlanner': TreatmentPlanner()
+    }
