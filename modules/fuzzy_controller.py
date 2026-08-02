@@ -3,7 +3,7 @@
 # Covers: Week 12 (Fuzzy Logic)
 # ============================================================
 
-import numpy as np
+from typing import Dict
 
 class FuzzySeverityAssessor:
     """
