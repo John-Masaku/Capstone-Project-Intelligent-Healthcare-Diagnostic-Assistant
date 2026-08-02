@@ -77,6 +77,10 @@ class HealthcareDiagnosticAgent:
 
     def think(self):
         """Step 2: Process and reason"""
+
+        if self.memory.current_patient is None:
+            raise ValueError("No patient has been perceived. Call perceive() first.")
+
         self.state = AgentState.DIAGNOSING
         self._log("Agent thinking: running diagnostic modules...")
 
@@ -85,9 +89,19 @@ class HealthcareDiagnosticAgent:
         # Run each registered module
         for module_name, module in self._modules.items():
             if hasattr(module, 'analyze'):
-                result = module.analyze(self.memory.current_patient)
-                results[module_name] = result
-                self._log(f"  [{module_name}] → {result.get('summary','done')}")
+                try:
+                    result = module.analyze(self.memory.current_patient)
+                    results[module_name] = result
+                    self._log(f"  [{module_name}] → {result.get('summary', 'done')}")
+
+                except Exception as e:
+                    results[module_name] = {
+                        "diagnosis": "Unavailable",
+                        "confidence": 0.0,
+                        "summary": f"Module error: {str(e)}"
+                    }
+
+                    self._log(f"  [{module_name}] → FAILED: {e}")
 
         self.memory.diagnosis_history.append(results)
         self.state = AgentState.RECOMMENDING
@@ -100,11 +114,19 @@ class HealthcareDiagnosticAgent:
 
         # Aggregate confidence from multiple modules
         confidences = [
-            v.get('confidence', 0)
-            for v in diagnosis_results.values()
-            if isinstance(v, dict) and 'confidence' in v
+            result["confidence"]
+            for result in diagnosis_results.values()
+            if (
+                isinstance(result, dict)
+                and result.get("diagnosis") != "Unavailable"
+                and "confidence" in result
+            )
         ]
-        avg_confidence = sum(confidences)/len(confidences) if confidences else 0.5
+
+        avg_confidence = (
+            sum(confidences) / len(confidences)
+            if confidences else 0.0
+        )
 
         # Determine urgency
         urgency = self._assess_urgency(patient, avg_confidence)
@@ -142,15 +164,30 @@ class HealthcareDiagnosticAgent:
         return "LOW"
 
     def _aggregate_diagnosis(self, results):
-        diagnoses = [
-            v.get('diagnosis', 'Unknown')
-            for v in results.values()
-            if isinstance(v, dict) and 'diagnosis' in v
-        ]
-        if not diagnoses:
+        """Combine module diagnoses using summed confidence scores."""
+
+        diagnosis_scores = {}
+
+        for result in results.values():
+            if not isinstance(result, dict):
+                continue
+
+            diagnosis = result.get("diagnosis")
+
+            # Ignore failed or missing diagnoses
+            if diagnosis in (None, "Unavailable", "Unknown"):
+                continue
+
+            confidence = result.get("confidence", 0.0)
+
+            diagnosis_scores[diagnosis] = (
+                diagnosis_scores.get(diagnosis, 0.0) + confidence
+            )
+
+        if not diagnosis_scores:
             return "Insufficient data"
-        from collections import Counter
-        return Counter(diagnoses).most_common(1)[0][0]
+
+        return max(diagnosis_scores, key=diagnosis_scores.get)
 
     def _generate_recommendations(self, urgency, results):
         base = {
