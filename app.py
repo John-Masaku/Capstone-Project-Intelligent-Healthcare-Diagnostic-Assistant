@@ -58,3 +58,95 @@ def build_system() -> HealthcareDiagnosticAgent:
         'FuzzyController': FuzzySeverityAssessor(),
         'TreatmentPlanner': TreatmentPlanner()
     }
+    
+    for name, module in modules.items():
+        agent.register_module(name, module)
+
+    return agent
+
+def main():
+    """Main application"""
+
+    banner()
+
+    # Build the AI system
+    agent = build_system()
+    
+    section("🩺 Creating Sample Patient")
+
+    patient = PatientPercept(
+        patient_id="P001",
+        symptoms=["fever", "cough", "fatigue"],
+        age=25,
+        temperature=38.6,
+        heart_rate=98,
+        blood_pressure="120/80"
+    )
+
+    print(f"Patient ID : {patient.patient_id}")
+    print(f"Symptoms   : {', '.join(patient.symptoms)}")
+    print(f"Temperature: {patient.temperature}°C")
+    print(f"Heart Rate : {patient.heart_rate} bpm")
+    print(f"Blood Pressure: {patient.blood_pressure}")
+    
+    section("🧠 Running Intelligent Diagnostic Agent")
+
+    report = agent.run(patient)
+
+    module_results = report["module_results"]
+
+    print("\n✅ Diagnosis Complete")
+
+    section("📋 Final Diagnostic Report")
+
+    print(f"Patient ID    : {report['patient_id']}")
+    print(f"Diagnosis     : {report['diagnosis']}")
+    print(f"Confidence    : {report['confidence']:.2f}")
+    print(f"Urgency       : {report['urgency']}")
+    print(f"Next Action   : {report['next_action']}")
+    
+    section("📝 AI Decision Explanation")
+
+    for line in report["explanation"]:
+        print(f"• {line}")
+
+    section("🧠 Individual AI Module Results")
+
+    for module, result in module_results.items():
+
+        print(f"\n[{module}]")
+
+        if isinstance(result, dict):
+
+            if "summary" in result:
+                print(f"Summary      : {result['summary']}")
+
+            if "diagnosis" in result:
+                print(f"Diagnosis    : {result['diagnosis']}")
+
+            if "confidence" in result:
+                print(f"Confidence   : {result['confidence']:.2f}")
+
+            # Fuzzy Logic output
+            if "severity_score" in result:
+                print(f"Severity     : {result['severity_label']}")
+                print(f"Score        : {result['severity_score']}/100")
+
+            # Treatment Planner output
+            if "plan" in result:
+                print("\nTreatment Plan:")
+                for step in result["plan"]:
+                    print(
+                        f"  {step['step']}. {step['action']} "
+                        f"({step['duration']})"
+                    )
+
+    print("\nRecommendations:")
+    for rec in report["recommendations"]:
+        print(f"  • {rec}")
+
+    print("\n🎉 Healthcare Diagnostic Process Completed Successfully!")
+    
+    
+if __name__ == "__main__":
+    main()

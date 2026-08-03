@@ -88,20 +88,26 @@ class HealthcareDiagnosticAgent:
 
         # Run each registered module
         for module_name, module in self._modules.items():
-            if hasattr(module, 'analyze'):
+
+            print(f"\n▶ Running {module_name}...")
+
+            if hasattr(module, "analyze"):
                 try:
                     result = module.analyze(self.memory.current_patient)
+
+                    print(f"✔ Finished {module_name}")
+
                     results[module_name] = result
-                    self._log(f"  [{module_name}] → {result.get('summary', 'done')}")
+                    self._log(f"[{module_name}] → {result.get('summary', 'done')}")
 
                 except Exception as e:
+                    print(f"❌ {module_name} crashed: {e}")
+
                     results[module_name] = {
                         "diagnosis": "Unavailable",
                         "confidence": 0.0,
-                        "summary": f"Module error: {str(e)}"
+                        "summary": str(e)
                     }
-
-                    self._log(f"  [{module_name}] → FAILED: {e}")
 
         self.memory.diagnosis_history.append(results)
         self.state = AgentState.RECOMMENDING
@@ -109,10 +115,11 @@ class HealthcareDiagnosticAgent:
 
     def act(self, diagnosis_results: Dict) -> Dict:
         """Step 3: Generate action/recommendation"""
+
         self.state = AgentState.PLANNING
         patient = self.memory.current_patient
 
-        # Aggregate confidence from multiple modules
+        # Aggregate confidence from all successful modules
         confidences = [
             result["confidence"]
             for result in diagnosis_results.values()
@@ -131,21 +138,31 @@ class HealthcareDiagnosticAgent:
         # Determine urgency
         urgency = self._assess_urgency(patient, avg_confidence)
 
+        # Get the final diagnosis from all modules
+        final_diagnosis = self._aggregate_diagnosis(diagnosis_results)
+
+        # Build the final report
         action_report = {
-            'patient_id':   patient.patient_id,
-            'timestamp':    patient.timestamp,
-            'symptoms':     patient.symptoms,
-            'diagnosis':    self._aggregate_diagnosis(diagnosis_results),
-            'confidence':   round(avg_confidence, 3),
-            'urgency':      urgency,
+            'patient_id': patient.patient_id,
+            'timestamp': patient.timestamp,
+            'symptoms': patient.symptoms,
+            'diagnosis': self._aggregate_diagnosis(diagnosis_results),
+            'confidence': round(avg_confidence, 3),
+            'urgency': urgency,
             'recommendations': self._generate_recommendations(
                 urgency, diagnosis_results),
-            'next_action':  self._decide_next_action(urgency)
+            'next_action': self._decide_next_action(urgency),
+            'module_results': diagnosis_results,
+            'explanation': self._generate_explanation(diagnosis_results)
         }
 
-        self.performance_score += (10 if avg_confidence > 0.7 else 5)
+        self.performance_score += (
+            10 if avg_confidence > 0.7 else 5
+        )
+
         self.state = AgentState.DONE
         self._log(f"Action generated: {urgency} urgency")
+
         return action_report
 
     def run(self, percept: PatientPercept) -> Dict:
@@ -164,24 +181,46 @@ class HealthcareDiagnosticAgent:
         return "LOW"
 
     def _aggregate_diagnosis(self, results):
-        """Combine module diagnoses using summed confidence scores."""
+        """
+        Weighted ensemble diagnosis.
+        More reliable AI models contribute more to the final decision.
+        """
+
+        # Reliability weights for each module
+        weights = {
+            "KnowledgeBase": 0.15,
+            "BayesianNet": 0.20,
+            "MLClassifier": 0.20,
+            "NeuralNetwork": 0.25,
+            "FuzzyController": 0.10,
+            "TreatmentPlanner": 0.10
+        }
 
         diagnosis_scores = {}
 
-        for result in results.values():
+        for module_name, result in results.items():
+
             if not isinstance(result, dict):
+                continue
+
+            # Fuzzy logic predicts severity, not disease
+            if module_name == "FuzzyController":
                 continue
 
             diagnosis = result.get("diagnosis")
 
-            # Ignore failed or missing diagnoses
             if diagnosis in (None, "Unavailable", "Unknown"):
                 continue
 
             confidence = result.get("confidence", 0.0)
 
+            weight = weights.get(module_name, 0.10)
+
+            weighted_score = confidence * weight
+
             diagnosis_scores[diagnosis] = (
-                diagnosis_scores.get(diagnosis, 0.0) + confidence
+                diagnosis_scores.get(diagnosis, 0.0)
+                + weighted_score
             )
 
         if not diagnosis_scores:
@@ -243,3 +282,23 @@ class HealthcareDiagnosticAgent:
             'performance_score': self.performance_score,
             'diagnoses_made':    len(self.memory.diagnosis_history)
         }
+    def _generate_explanation(self, results):
+        """
+        Create a human-readable explanation of how the diagnosis was reached.
+        """
+
+        explanation = []
+
+        for module_name, result in results.items():
+
+            if not isinstance(result, dict):
+                continue
+
+            diagnosis = result.get("diagnosis", "Unknown")
+            confidence = result.get("confidence", 0.0)
+
+            explanation.append(
+                f"{module_name}: {diagnosis} ({confidence:.2f})"
+            )
+
+        return explanation
