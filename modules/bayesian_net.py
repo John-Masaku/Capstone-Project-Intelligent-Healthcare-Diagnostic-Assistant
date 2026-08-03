@@ -118,4 +118,4 @@ class SimpleBayesianDiagnostics:
             for s in symptoms_clean
         ]
         return f"P({disease}) = {self.priors[disease]} × " + \
-               " × ".join(evidence)  
+               " × ".join(evidence)   
